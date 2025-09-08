@@ -1,4 +1,4 @@
-# onedata-images
+# image-env-build
 
 To build and push generic images.
 
