@@ -1,0 +1,177 @@
+name: Build and Push Docker Images
+run-name: Image folder ${{ inputs.image_folder_name }} to env ${{ inputs.environment}} by @${{ github.actor }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: 'The tooling environment runner to use'
+        required: true
+        default: 'stg'
+        type: choice
+        options:
+        - 'stg'
+        - 'prod'
+      environment:
+        description: 'The environment to use must match runner'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - 'staging'
+        - 'production'
+      image_folder_name:
+        description: 'Image folder name should match folder you added in PR'
+        required: true
+        type: choice
+        options:
+        - 'busybox'
+        - 'github-runner'
+
+
+env:
+  GCR_REGION: asia-northeast1-docker.pkg.dev
+
+
+jobs:
+  environment_variables:
+    runs-on: [ self-hosted, Linux, X64, "${{ inputs.runner }}" , tooling]
+    outputs:
+      gcp_project_id: "${{ steps.set_env_vars.outputs.gcp_project_id }}"
+      gcp_reg_name: "${{ steps.set_env_vars.outputs.gcp_reg_name }}"
+    steps:
+
+      - name: Set Environment Variables
+        id: set_env_vars
+        run: |
+          SELECTED_ENV="${{ github.event.inputs.environment }}"
+
+          GCP_PROJECT_ID=""
+          GCP_REG_NAME=""
+
+          case "$SELECTED_ENV" in
+            "staging")
+              GCP_PROJECT_ID="stg"
+              GCP_REG_NAME="stg-middleware-repo"
+              ;;
+            "production")
+              GCP_PROJECT_ID="prod"
+              GCP_REG_NAME="prod-middleware-repo"
+              ;;
+            *)
+              echo "Error: Unknown environment '$SELECTED_ENV'"
+              exit 1
+              ;;
+          esac
+
+          echo "Selected environment: $SELECTED_ENV"
+
+          echo "gcp_project_id=$GCP_PROJECT_ID" >> "$GITHUB_OUTPUT"
+          echo "gcp_reg_name=$GCP_REG_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Test use Environment Variables in a Subsequent Step
+        run: |
+          echo "Current GCP_PROJECT_ID: ${{ steps.set_env_vars.outputs.gcp_project_id }}"
+          echo "Current GCP_REG_NAME:  ${{ steps.set_env_vars.outputs.gcp_reg_name }}"
+
+  build-push-image:
+    runs-on: [ self-hosted, Linux, X64, "${{ inputs.runner }}" , tooling]
+    needs: environment_variables
+    env:
+      GCP_PROJECT_ID: "${{ needs.environment_variables.outputs.gcp_project_id }}"
+      GCP_REG_NAME: "${{ needs.environment_variables.outputs.gcp_reg_name }}"
+
+    steps:
+
+      - name: Test Use global environment variables in a step
+        run: |
+          echo "GCP Project ID (global env var): $GCP_PROJECT_ID"
+          echo "GCP Registry Name (global env var): $GCP_REG_NAME"
+
+      # Need todo in same job as secrets can not be passed via jobs
+      - name: Set secret environment variables
+        id: set-secret
+        run: |
+          SELECTED_ENV="${{ github.event.inputs.environment }}"
+
+          GAR_JSON_KEY=""
+
+          case "$SELECTED_ENV" in
+            "staging")
+              echo "GAR_JSON_KEY=${{ secrets.GCP_STG_SA_KEY_BASE64 }}" >> $GITHUB_ENV
+              ;;
+            "production")
+              echo "GAR_JSON_KEY=${{ secrets.GCP_PROD_SA_KEY_BASE64 }}" >> $GITHUB_ENV
+              ;;
+            *)
+              echo "Error: Unknown environment '$SELECTED_ENV'"
+              exit 1
+              ;;
+          esac
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: '${{ github.ref }}'
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Google ACR ${{ env.GCP_REG_NAME }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.GCR_REGION }}
+          username: _json_key_base64
+          password: ${{ env.GAR_JSON_KEY }}
+
+      - name: Get image make tag
+        id: get-tag
+        run: |
+          TAG=$(make -s -C images/${{ inputs.image_folder_name }} tag)
+          echo "Tag is $TAG"
+          echo "IMAGE_TAG=${TAG}" >> $GITHUB_ENV
+
+      - name: Get image make name
+        id: get-name
+        run: |
+          NAME=$(make -s -C images/${{ inputs.image_folder_name }} image_name)
+          echo "Name is $NAME"
+          echo "MAKE_IMAGE_NAME=${NAME}" >> $GITHUB_ENV
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ env.GAR_JSON_KEY }}
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Check if image tag exists
+        id: check_tag
+        run: |
+          IMAGE_NAME="${{ env.GCR_REGION }}/${{ env.GCP_PROJECT_ID }}/${{ env.GCP_REG_NAME }}/${{ env.MAKE_IMAGE_NAME }}"
+          FULL_IMAGE_NAME="${IMAGE_NAME}:${{ env.IMAGE_TAG }}"
+          echo FULL_IMAGE_NAME=${FULL_IMAGE_NAME} >> $GITHUB_ENV
+
+          if gcloud container images list-tags "${IMAGE_NAME}" --format="value(tags)" | grep ${{ env.IMAGE_TAG }}; then
+            echo "::set-output name=exists::true"
+            echo "Image tag ${FULL_IMAGE_NAME} exists in GCR, please update the image tag..."
+            exit 1
+          else
+            echo "::set-output name=exists::false"
+            echo "Image tag ${FULL_IMAGE_NAME} does not exist in GCR."
+          fi
+
+      - name: Build and push Docker image to ${{ env.GCP_REG_NAME }}
+        uses: docker/build-push-action@v6
+        if: steps.check_tag.outputs.exists == 'false'
+        with:
+          platforms: linux/amd64
+          context: images/${{ inputs.image_folder_name }}
+          file: images/${{ inputs.image_folder_name }}/Dockerfile
+          provenance: false
+          push: true
+          tags: ${{ env.FULL_IMAGE_NAME }}
