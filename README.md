@@ -2,7 +2,9 @@
 
 To build and push generic images.
 
-Based on user input can build then push to following GCP projects registries.
+This repo is based on GCP but with changes could apply to any public cloud provider that has support with GitHub Actions.
+
+Based on user input can build then push to following GCP projects registries (GAR).
 
 - stg - stg-middleware-repo
 - prod - prod-middleware-repo
