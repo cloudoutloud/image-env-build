@@ -8,18 +8,25 @@ jobs:
   delete-gh-environment:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
       deployments: write
 
     steps:
+    - name: Generate GitHub App Token
+      id: generate_token
+      uses: actions/create-github-app-token@v1
+      with:
+        app-id: ${{ secrets.GH_APP_ID }}
+        private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+
     - name: Delete GitHub Environment
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
       run: |
         ENV_NAME="preview-${PR_NUMBER}"
 
         echo "Deleting github environment: ${ENV_NAME}"
-        gh api repos/${{ github.repository }}/environments/${ENV_NAME} -X DELETE || echo "Environment not found or already deleted"
+        gh api repos/${{ github.repository }}/environments/${ENV_NAME} -X DELETE || echo "Environment not found or issue deleting"
 
-        echo "✓ GitHub Environment '${ENV_NAME}' deleted"
+        echo "GitHub Environment '${ENV_NAME}' deleted"
