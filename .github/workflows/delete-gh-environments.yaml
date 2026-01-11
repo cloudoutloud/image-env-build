@@ -8,7 +8,7 @@ jobs:
   delete-gh-environment:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       deployments: write
 
     steps:
