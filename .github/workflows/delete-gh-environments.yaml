@@ -5,7 +5,7 @@ on:
     types: [ closed ]
 
 jobs:
-  delete-environment:
+  delete-gh-environment:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -20,6 +20,6 @@ jobs:
         ENV_NAME="preview-${PR_NUMBER}"
 
         echo "Deleting github environment: ${ENV_NAME}"
-        gh api repos/${{ github.repository_owner }}/${{ github.repository }}/environments/${ENV_NAME} -X DELETE || echo "Environment not found or already deleted"
+        gh api repos/${{ github.repository }}/environments/${ENV_NAME} -X DELETE || echo "Environment not found or already deleted"
 
         echo "✓ GitHub Environment '${ENV_NAME}' deleted"
