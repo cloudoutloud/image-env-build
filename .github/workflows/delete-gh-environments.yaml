@@ -21,7 +21,7 @@ jobs:
 
     - name: Delete GitHub Environment
       env:
-        GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
+        GH_TOKEN: ${{ steps.generate_token.outputs.token }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
       run: |
         ENV_NAME="preview-${PR_NUMBER}"
