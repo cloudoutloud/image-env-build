@@ -23,12 +23,12 @@ jobs:
 
     - name: Build container image
       run: |
-        docker build -t db-operator:${{ github.sha }} -f images/busybox/Dockerfile .
+        docker build -t busybox:${{ github.sha }} -f images/busybox/Dockerfile .
 
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@0.35.0
       with:
-        image-ref: "db-operator:${{ github.sha }}"
+        image-ref: "busybox:${{ github.sha }}"
         format: "github"
         output: "trivy-report.md"
         exit-code: "0"
