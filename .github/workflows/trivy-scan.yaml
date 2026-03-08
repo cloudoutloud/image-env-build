@@ -29,8 +29,8 @@ jobs:
       uses: aquasecurity/trivy-action@0.35.0
       with:
         image-ref: "busybox:${{ github.sha }}"
-        format: "github"
-        output: "trivy-report.md"
+        format: "table"
+        output: "trivy-report.txt"
         exit-code: "0"
         severity: "CRITICAL,HIGH,MEDIUM,LOW"
 
@@ -62,4 +62,4 @@ jobs:
       uses: marocchino/sticky-pull-request-comment@v2
       with:
         header: trivy-scan
-        path: trivy-report.md
+        path: trivy-report.txt
