@@ -1,0 +1,65 @@
+name: Trivy Security Scan
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+    - main
+  push:
+    branches:
+    - main
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  trivy-scan:
+    name: Trivy Container Scan
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    - name: Build container image
+      run: |
+        docker build -t db-operator:${{ github.sha }} -f images/busybox/Dockerfile .
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@v0.35.0
+      with:
+        image-ref: "db-operator:${{ github.sha }}"
+        format: "github"
+        output: "trivy-report.md"
+        exit-code: "0"
+        severity: "CRITICAL,HIGH,MEDIUM,LOW"
+
+    # - name: Create report summary
+    #   if: always()
+    #   run: |
+    #     {
+    #       echo "## 🔍 Trivy Security Scan Report"
+    #       echo ""
+    #       echo "**Image:** \`db-operator:${{ github.sha }}\`"
+    #       echo "**Triggered by:** PR #${{ github.event.pull_request.number }}"
+    #       echo ""
+    #       if [ -s trivy-report.txt ]; then
+    #         echo "<details>"
+    #         echo "<summary>Click to expand full report</summary>"
+    #         echo ""
+    #         echo '```'
+    #         cat trivy-report.txt
+    #         echo '```'
+    #         echo "</details>"
+    #       else
+    #         echo "✅ No vulnerabilities found!"
+    #       fi
+    #     } > trivy-comment.md
+
+    # Updates comment for every commit
+    - name: Comment PR with Trivy report
+      # if: always()
+      uses: marocchino/sticky-pull-request-comment@v2
+      with:
+        header: trivy-scan
+        path: trivy-report.md
