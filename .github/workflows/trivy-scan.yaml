@@ -26,7 +26,7 @@ jobs:
         docker build -t db-operator:${{ github.sha }} -f images/busybox/Dockerfile .
 
     - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@v0.35.0
+      uses: aquasecurity/trivy-action@0.35.0
       with:
         image-ref: "db-operator:${{ github.sha }}"
         format: "github"
