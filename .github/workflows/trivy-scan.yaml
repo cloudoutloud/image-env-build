@@ -55,9 +55,9 @@ jobs:
         ignore-unfixed: true
         vuln-type: 'os,library'
         severity: "CRITICAL,HIGH,MEDIUM,LOW"
-        output: 'trivy-report.txt'
+        # output: 'trivy-report.txt'
 
-    # Updates comment for every commit
+        # Updates comment for every commit
     - name: Comment PR with Trivy report
       # if: always()
       uses: marocchino/sticky-pull-request-comment@v2
