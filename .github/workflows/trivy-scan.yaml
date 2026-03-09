@@ -54,13 +54,24 @@ jobs:
         exit-code: '0'
         ignore-unfixed: true
         vuln-type: 'os,library'
-        severity: "CRITICAL,HIGH,MEDIUM,LOW"
-        # output: 'trivy-report.txt'
+        severity: "CRITICAL"
+        output: 'trivy-report.txt'
 
-        # Updates comment for every commit
+    - name: Wrap report in markdown
+      if: always()
+      run: |
+        {
+          echo "## 🔍 Trivy Scan: \`${{ matrix.image }}\`"
+          echo ""
+          echo '```'
+          cat trivy-report.txt
+          echo '```'
+        } > trivy-comment.md
+
+    # Updates comment for every commit
     - name: Comment PR with Trivy report
       # if: always()
       uses: marocchino/sticky-pull-request-comment@v2
       with:
         header: trivy-scan-${{ matrix.image }}
-        path: trivy-report.txt
+        path: trivy-comment.md
