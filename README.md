@@ -27,7 +27,7 @@ tag:
 	@echo "v1.0.0"
 ```
 
-3. Define the specifci image_name you want to use and tag. This will be included in the full image path for example.
+3. Define the specific image_name you want to use and tag. This will be included in the full image path for example.
 
 ```
 asia-northeast1-docker.pkg.dev/stg/stg-middleware-repo/github-runner:v1.0.0
@@ -41,3 +41,7 @@ image_folder_name:
     required: true
     type: choice
 ```
+
+## Trivy scan
+
+Trivy scan will run on each PR to build images and scan for currently any critical vulnerabilities.

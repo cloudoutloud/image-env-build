@@ -14,52 +14,64 @@ permissions:
   pull-requests: write
 
 jobs:
-  trivy-scan:
-    name: Trivy Container Scan
+  discover-images:
+    name: Discover Images
     runs-on: ubuntu-latest
+    outputs:
+      images: ${{ steps.find.outputs.images }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    - name: Find all image directories
+      id: find
+      run: |
+        images=$(find images -name "Dockerfile" -exec dirname {} \; | xargs -I{} basename {} | jq -R -s -c 'split("\n") | map(select(length > 0))')
+        echo "images=$images" >> "$GITHUB_OUTPUT"
+        echo "Found images: $images"
+
+  trivy-scan:
+    name: Trivy Scan - ${{ matrix.image }}
+    needs: discover-images
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJson(needs.discover-images.outputs.images) }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
 
     - name: Build container image
       run: |
-        docker build -t db-operator:${{ github.sha }} -f images/busybox/Dockerfile .
+        docker build -t ${{ matrix.image }}:${{ github.sha }} -f images/${{ matrix.image }}/Dockerfile images/${{ matrix.image }}/
 
     - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@v0.35.0
+      uses: aquasecurity/trivy-action@0.35.0
       with:
-        image-ref: "db-operator:${{ github.sha }}"
-        format: "github"
-        output: "trivy-report.md"
-        exit-code: "0"
-        severity: "CRITICAL,HIGH,MEDIUM,LOW"
+        image-ref: "${{ matrix.image }}:${{ github.sha }}"
+        format: 'table'
+        exit-code: '0'
+        ignore-unfixed: true
+        vuln-type: 'os,library'
+        severity: "CRITICAL"
+        output: 'trivy-report.txt'
 
-    # - name: Create report summary
-    #   if: always()
-    #   run: |
-    #     {
-    #       echo "## 🔍 Trivy Security Scan Report"
-    #       echo ""
-    #       echo "**Image:** \`db-operator:${{ github.sha }}\`"
-    #       echo "**Triggered by:** PR #${{ github.event.pull_request.number }}"
-    #       echo ""
-    #       if [ -s trivy-report.txt ]; then
-    #         echo "<details>"
-    #         echo "<summary>Click to expand full report</summary>"
-    #         echo ""
-    #         echo '```'
-    #         cat trivy-report.txt
-    #         echo '```'
-    #         echo "</details>"
-    #       else
-    #         echo "✅ No vulnerabilities found!"
-    #       fi
-    #     } > trivy-comment.md
+    - name: Wrap report in markdown
+      if: always()
+      run: |
+        {
+          echo "## 🔍 Trivy Scan: \`${{ matrix.image }}\`"
+          echo ""
+          echo '```'
+          cat trivy-report.txt
+          echo '```'
+        } > trivy-comment.md
 
     # Updates comment for every commit
     - name: Comment PR with Trivy report
       # if: always()
       uses: marocchino/sticky-pull-request-comment@v2
       with:
-        header: trivy-scan
-        path: trivy-report.md
+        header: trivy-scan-${{ matrix.image }}
+        path: trivy-comment.md
