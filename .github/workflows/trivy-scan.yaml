@@ -46,34 +46,54 @@ jobs:
       run: |
         docker build -t ${{ matrix.image }}:${{ github.sha }} -f images/${{ matrix.image }}/Dockerfile images/${{ matrix.image }}/
 
+    - name: Export image for scanning locally
+      id: export-image
+      run: |
+        buildah push ${{ steps.build-image.outputs.image }}:${{ env.TAGS }} \
+          docker-archive:/tmp/scan-image.tar
+
     - name: Run Trivy vulnerability scanner
+      id: trivy-scan
       uses: aquasecurity/trivy-action@0.35.0
       with:
-        image-ref: "${{ matrix.image }}:${{ github.sha }}"
+        scan-type: 'image'
+        input: /tmp/scan-image.tar
         format: 'table'
-        exit-code: '0'
+        exit-code: '1'
         ignore-unfixed: true
         vuln-type: 'os,library'
-        severity: "CRITICAL"
-        output: 'trivy-report.txt'
+        severity: "CRITICAL,HIGH"
       env:
         TRIVY_DISABLE_VEX_NOTICE: 'false'
 
-    - name: Wrap report in markdown
-      if: always()
-      run: |
-        {
-          echo "## 🔍 Trivy Scan: \`${{ matrix.image }}\`"
-          echo ""
-          echo '```'
-          cat trivy-report.txt
-          echo '```'
-        } > trivy-comment.md
+    # - name: Run Trivy vulnerability scanner
+    #   uses: aquasecurity/trivy-action@0.35.0
+    #   with:
+    #     image-ref: "${{ matrix.image }}:${{ github.sha }}"
+    #     format: 'table'
+    #     exit-code: '0'
+    #     ignore-unfixed: true
+    #     vuln-type: 'os,library'
+    #     severity: "CRITICAL"
+    #     output: 'trivy-report.txt'
+    #   env:
+    #     TRIVY_DISABLE_VEX_NOTICE: 'false'
 
-    # Updates comment for every commit
-    - name: Comment PR with Trivy report
-      # if: always()
-      uses: marocchino/sticky-pull-request-comment@v2
-      with:
-        header: trivy-scan-${{ matrix.image }}
-        path: trivy-comment.md
+    # - name: Wrap report in markdown
+    #   if: always()
+    #   run: |
+    #     {
+    #       echo "## 🔍 Trivy Scan: \`${{ matrix.image }}\`"
+    #       echo ""
+    #       echo '```'
+    #       cat trivy-report.txt
+    #       echo '```'
+    #     } > trivy-comment.md
+
+    # # Updates comment for every commit
+    # - name: Comment PR with Trivy report
+    #   # if: always()
+    #   uses: marocchino/sticky-pull-request-comment@v2
+    #   with:
+    #     header: trivy-scan-${{ matrix.image }}
+    #     path: trivy-comment.md
