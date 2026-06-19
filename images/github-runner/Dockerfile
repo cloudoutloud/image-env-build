@@ -9,9 +9,9 @@ ENV YQ_VERSION v4.44.2
 ARG DEBIAN_FRONTEND=noninteractive
 
 # install basic dependencies
-RUN apt update && apt install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     vim xxd gnupg make rsync && \
-    apt clean && rm -rf /var/lib/apt/lists/*
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # install yq
 RUN curl -L https://github.com/mikefarah/yq/releases/download/$YQ_VERSION/yq_linux_amd64 -o /usr/local/bin/yq && \
@@ -22,9 +22,10 @@ RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/s
 RUN install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 
 # install helm
-RUN curl -LO "https://get.helm.sh/helm-$HELM_VERSION-linux-amd64.tar.gz"
-RUN tar -zxvf helm-$HELM_VERSION-linux-amd64.tar.gz
-RUN mv linux-amd64/helm /usr/local/bin/helm
+RUN curl -LO "https://get.helm.sh/helm-$HELM_VERSION-linux-amd64.tar.gz" && \
+    tar -zxvf helm-$HELM_VERSION-linux-amd64.tar.gz && \
+    mv linux-amd64/helm /usr/local/bin/helm && \
+    rm -rf helm-$HELM_VERSION-linux-amd64.tar.gz linux-amd64
 
 # switch to runner user, because runner agent service should not run by Sudo
 USER runner
