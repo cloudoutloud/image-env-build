@@ -42,6 +42,16 @@ image_folder_name:
     type: choice
 ```
 
-## Trivy scan
+## Trivy security scan
 
 Trivy scan will run on each PR to build images and scan for currently any critical vulnerabilities.
+
+This is configured in the `.github/workflows/trivy-scan.yaml` pipeline, which runs on `pull_request`.
+It discovers every image under `images/` automatically, builds each `Dockerfile`, and scans the
+resulting image with Trivy, posting the results back to the PR.
+
+## Claude skill
+
+There is a hadolint linting Claude skill (`hadolint-fix`) that scans the `images/` Dockerfiles
+against Docker best practices, applies safe fixes, and opens a PR with the changes. It can be
+invoked manually before committing an image to the repo to catch issues early.
